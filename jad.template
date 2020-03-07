@@ -1,0 +1,8 @@
+MIDlet-Name: @midletName@
+MIDlet-Version: @buildVer@
+MIDlet-Vendor: BBSmart
+MicroEdition-Profile: MIDP-1.0
+MicroEdition-Configuration: CLDC-1.0
+MIDlet-Jar-URL: @jarName@
+MIDlet-Jar-Size: @jarSize@
+MIDlet-1: Traffic,,

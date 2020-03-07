@@ -1,0 +1,31 @@
+<loader version="1.0">
+	<application id="BestQuotes">
+		<name >
+			Traffic
+		</name>
+		<description >
+			
+		</description>
+		<version >
+			0.1
+		</version>
+		<vendor >
+			BBSmart
+		</vendor>
+		<copyright >
+			Copyright (c) 2007 BBSmart
+		</copyright>
+		<fileset Java="1.17">
+			<directory >
+				
+			</directory>
+			<files >
+				Traffic.cod
+
+			</files>
+
+		</fileset>
+
+	</application>
+
+</loader>

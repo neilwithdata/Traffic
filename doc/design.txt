@@ -1,0 +1,8 @@
+MVC Design Pattern
+
+The models are clean, and simply represent the state of play at any given time.
+
+Problems
+----------------
+Game has 3 modes: Easy, Medium and Hard
+These correspond to the size of the playing board: 6x6, 9x9 or 12x12

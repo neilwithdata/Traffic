@@ -1,0 +1,189 @@
+<project name="Traffic" default="build" basedir=".">
+	<!-- ***************************************************************** -->
+	<!-- TARGET BLACKBERRY OS VERSION                              		   -->
+	<!-- Can be either: 4.0, 4.0.2, 4.1.0 or 4.2.0						   -->
+	<!-- ***************************************************************** -->
+	<property name="blackberry.os.version" value="4.1.0" />
+	<property name="debug.enabled" value="false" />
+
+	<property name="wtk.home" value="C:\WTK25" />
+
+	<property name="ver" value="0.1" />
+	<property name="codename" value="Traffic" />
+
+	<property name="build.jars" location="lib/thirdparty" />
+	<property name="bbjdebuild.jars" location="${build.jars}/jde${blackberry.os.version}" />
+	<property name="net_rim_api.jar" value="${bbjdebuild.jars}/net_rim_api.jar" />
+	<property name="signaturetool.jar" value="${build.jars}/SignatureTool.jar" />
+
+	<property name="src" location="src" />
+	<property name="resources" location="res" />
+	<property name="lib" location="lib" />
+
+	<property name="unpreverified.classes" value="classes/unpreverified" />
+	<property name="obfuscated.classes" value="classes/obfuscated" />
+	<property name="final.classes" value="classes/final" />
+
+	<property name="name" value="${codename}" />
+	<property name="jad.template" value="jad.template" />
+	<property name="jadfile" value="output/tojar/${name}.jad" />
+	<property name="jarfile" value="output/tojar/${name}.jar" />
+	<property name="ota.dir" value="output/tocod/ota" />
+	<property name="bbdm.dir" value="output/tocod/bbdm" />
+
+	<property name="final.jar" value="output/tojar/${name}.jar" />
+
+	<property name="wtk.home" value="${j2mewtk.home}" />
+	<property name="antenna.jar" value="antenna-bin-0.9.14.jar" />
+
+	<taskdef name="wtkbuild" classname="de.pleumann.antenna.WtkBuild" classpath="${build.jars}/${antenna.jar}" />
+	<taskdef name="wtkpreverify" classname="de.pleumann.antenna.WtkPreverify" classpath="${build.jars}/${antenna.jar}" />
+	<taskdef name="wtkpackage" classname="de.pleumann.antenna.WtkPackage" classpath="${build.jars}/${antenna.jar}" />
+	
+	<taskdef resource="net/sf/antcontrib/antlib.xml">
+	  <classpath>
+	    <pathelement location="${build.jars}/ant-contrib-1.0b3.jar"/>
+	  </classpath>
+	</taskdef>
+
+	<target name="clean">
+		<delete file="${name}.jad" />
+		<delete file="${name}.jar" />
+		<delete file="${codename}.cod" />
+		<delete file="${codename}.lst" />
+		<delete>
+			<fileset dir="." includes="*.debug" />
+		</delete>
+		<delete file="${codename}.csl" />
+		<delete file="${codename}.cso" />
+		<delete dir="classes" />
+		<delete dir="output" />
+	</target>
+
+	<target name="init" depends="clean">
+		<mkdir dir="classes" />
+		<mkdir dir="${unpreverified.classes}" />
+		<mkdir dir="${final.classes}" />
+		<mkdir dir="output" />
+		<mkdir dir="output/tojar" />
+		<mkdir dir="output/tocod" />
+		<mkdir dir="output/tocod/ota" />
+		<mkdir dir="output/tocod/bbdm" />
+	</target>
+
+	<!-- Compile the code -->
+	<target name="javacompile" depends="init">
+		<wtkbuild srcdir="${src}" destdir="${unpreverified.classes}" bootclasspath="${net_rim_api.jar}" />
+	</target>
+
+	<!-- Preverify the compiled code -->
+	<target name="preverify" depends="javacompile">
+		<wtkpreverify srcdir="${unpreverified.classes}" destdir="${final.classes}" classpath="${net_rim_api.jar}" />
+	</target>
+
+	<!-- Version the JAD File -->
+	<target name="version" depends="preverify">
+		<!-- Version the JAD file -->
+		<filter token="buildVer" value="${ver}" />
+		<filter token="midletName" value="${name}" />
+		<filter token="jarName" value="${name}.jar" />
+		<copy file="${jad.template}" tofile="${jadfile}" filtering="true" overwrite="true" />
+	</target>
+
+	<!-- Package (JAR) the compiled classes. This also modifies the JAD file with JAR size information -->
+	<target name="package" depends="version">
+		<wtkpackage jarfile="${final.jar}" jadfile="${jadfile}">
+			<fileset dir="${final.classes}" />
+			<fileset dir="${resources}" />
+		</wtkpackage>
+	</target>
+
+	<!-- Invoke the RAPC compiler. This step is based the RAPC's usage: rapc.exe import=RIM_APIs codename=Codename JAD-File JAR-File -->
+	<target name="rapc" depends="package" description="RIM COD Compiler">
+		<exec dir="." executable="${bbjdebuild.jars}/rapc.exe">
+			<arg line=" import=&quot;${net_rim_api.jar}&quot; " />
+			<arg line=" codename=${codename} " />
+			<arg line=" ${jadfile} " />
+			<arg line=" ${jarfile} " />
+		</exec>
+	</target>
+
+	<target name="sign" depends="rapc" description="Signs the cod file; necessary for deployment">
+		<if>
+			<equals arg1="${debug.enabled}" arg2="false" />
+			<then>
+				<java jar="${signaturetool.jar}" fork="true">
+					<arg line=" -a " />
+					<arg line=" -c " />
+					<arg line=" ${codename}.cod " />
+				</java>
+			</then>
+		</if>
+	</target>
+
+	<!-- Once the COD file has been generated & signed, move generated file to output directory -->
+	<target name="build" depends="sign">
+		<move file="${codename}.cod" tofile="output/tocod/${codename}.cod" />
+		<move todir="output/tocod">
+			<fileset dir="." includes="*.debug" />
+		</move>
+		<move file="${codename}.cso" tofile="output/tocod/${codename}.cso" />
+		<copy file="${codename}.alx" tofile="output/tocod/${codename}.alx" />
+		<copy file="${jadfile}" tofile="output/tocod/${codename}.jad" />
+
+		<!-- Setup the OTA and BBDM directories which contain final files necessary for deployment -->
+		<copy file="${jadfile}" tofile="${ota.dir}/${codename}.jad" />
+		<copy file="output/tocod/${codename}.cod" tofile="${ota.dir}/${codename}.cod" />
+		<!-- <copy file="output/tocod/${codename}.cod" tofile="${ota.dir}/${codename}_temp.cod" />
+		<unzip src="${ota.dir}/${codename}_temp.cod" dest="${ota.dir}" />
+		<delete file="${ota.dir}/${codename}_temp.cod" /> -->
+	</target>
+
+	<target name="updatesim" depends="build" description="Update BlackBerry Simulator">
+		<copy todir="${blackberry.simulator.path}/">
+			<fileset dir="output/tocod" />
+		</copy>
+	</target>
+
+	<target name="7230-run">
+		<property name="blackberry.simulator.path" value="C:\Program Files\Research In Motion\BlackBerry JDE 4.0.2\simulator" />
+		<antcall target="updatesim" />
+		<exec dir="${blackberry.simulator.path}" executable="${blackberry.simulator.path}/../bin/fledge.exe">
+			<arg line=" /app=Jvm.dll " />
+			<arg line=" /handheld=7230 " />
+			<arg line=" /app-param=DisableRegistration " />
+			<arg line=" /app-param=JvmAlxConfigFile:7230.xml " />
+			<arg line=" /data-port=0x4d44 " />
+			<arg line=" /data-port=0x4d4e " />
+			<arg line=" /pin=0x2100000A " />
+		</exec>
+	</target>
+
+	<target name="7290-run">
+		<property name="blackberry.simulator.path" value="C:\Program Files\Research In Motion\BlackBerry JDE 4.1.0\simulator" />
+		<antcall target="updatesim" />
+		<exec dir="${blackberry.simulator.path}" executable="${blackberry.simulator.path}/../bin/fledge.exe">
+			<arg line=" /app=Jvm.dll " />
+			<arg line=" /handheld=7290 " />
+			<arg line=" /app-param=DisableRegistration " />
+			<arg line=" /app-param=JvmAlxConfigFile:7290.xml " />
+			<arg line=" /data-port=0x4d44 " />
+			<arg line=" /data-port=0x4d4e " />
+			<arg line=" /pin=0x2100000A " />
+		</exec>
+	</target>
+
+	<target name="8700g-run">
+		<property name="blackberry.simulator.path" value="C:\Program Files\Research In Motion\BlackBerry Device Simulators 4.1.0\Device Simulators 4.1.0.286" />
+		<antcall target="updatesim" />
+		<exec dir="${blackberry.simulator.path}" executable="${blackberry.simulator.path}/fledge.exe">
+			<arg line=" /app=Jvm.dll " />
+			<arg line=" /handheld=8700g " />
+			<arg line=" /app-param=DisableRegistration " />
+			<arg line=" /app-param=JvmAlxConfigFile:8700g.xml " />
+			<arg line=" /data-port=0x4d44 " />
+			<arg line=" /data-port=0x4d4e " />
+			<arg line=" /pin=0x2100000A " />
+		</exec>
+	</target>
+</project>
